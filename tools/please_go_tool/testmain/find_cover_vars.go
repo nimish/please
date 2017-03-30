@@ -1,6 +1,5 @@
-// Package buildgo contains utilities used by plz_go_test.
-// It's split up mostly for ease of testing.
-package buildgo
+// Package testmain implements test main templating for please_go_tool.
+package testmain
 
 import (
 	"io/ioutil"

@@ -1,4 +1,4 @@
-package buildgo
+package testmain
 
 import (
 	"fmt"

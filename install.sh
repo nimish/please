@@ -31,8 +31,8 @@ cp -f plz-out/bin/tools/cache_cleaner/cache_cleaner ${DEST}/cache_cleaner
 chmod 0775 ${DEST}/cache_cleaner
 cp -f plz-out/bin/tools/please_diff_graphs/please_diff_graphs ${DEST}/please_diff_graphs
 chmod 0775 ${DEST}/please_diff_graphs
-cp -f plz-out/bin/tools/please_go_test/please_go_test ${DEST}/please_go_test
-chmod 0775 ${DEST}/please_go_test
+cp -f plz-out/bin/tools/please_go_tool/please_go_tool ${DEST}/please_go_tool
+chmod 0775 ${DEST}/please_go_tool
 cp -f plz-out/bin/tools/linter/linter ${DEST}/please_build_linter
 chmod 0775 ${DEST}/please_build_linter
 cp -f plz-out/bin/tools/javac_worker/javac_worker ${DEST}/javac_worker

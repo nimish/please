@@ -1,5 +1,5 @@
 go_library(
-    name = 'buildgo',
+    name = 'testmain',
     srcs = [
         'find_cover_vars.go',
         'write_test_main.go',
@@ -7,17 +7,7 @@ go_library(
     deps = [
         '//third_party/go:logging',
     ],
-)
-
-go_binary(
-    name = 'please_go_test',
-    srcs = ['plz_go_test.go'],
-    deps = [
-        ':buildgo',
-        '//src/cli',
-        '//third_party/go:logging',
-    ],
-    visibility = ['PUBLIC'],
+    visibility = ['//tools/please_go_tool/...'],
 )
 
 go_test(
@@ -31,7 +21,7 @@ go_test(
         ':test_excluded_archive',
     ],
     deps = [
-        ':buildgo',
+        ':testmain',
         '//third_party/go:testify',
     ],
 )
@@ -49,7 +39,7 @@ go_test(
     srcs = ['write_test_main_test.go'],
     data = glob(['test_data/*.go']),
     deps = [
-        ':buildgo',
+        ':testmain',
         '//third_party/go:testify',
     ],
 )
