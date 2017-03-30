@@ -17,13 +17,19 @@ import (
 
 var log = logging.MustGetLogger("remote")
 
-const template = `
-go_remote_library(
+const template = `go_remote_library(
     name = '%s',
     url = '%s',
+    revision = '%s',
     deps = [
         '%s',
     ],
+)
+`
+const noDepsTemplate = `go_remote_library(
+    name = '%s',
+    url = '%s',
+    revision = '%s',
 )
 `
 
@@ -47,18 +53,26 @@ func FetchLibraries(gotool string, shortFormat bool, packages ...string) (string
 		return "", err
 	}
 	// Now build up the response.
-	var buf bytes.Buffer
-	m := packageData.ToMap()
-	for _, pkg := range packageData {
-		if !pkg.Standard {
-			if shortFormat {
+	if shortFormat {
+		var buf bytes.Buffer
+		m := packageData.ToMap()
+		for _, pkg := range packageData {
+			if !pkg.Standard {
 				buf.WriteString(pkg.ToShortFormatString(m))
-			} else {
-				buf.WriteString(pkg.ToBuildRule(m))
 			}
 		}
+		return buf.String(), nil
 	}
-	return buf.String(), nil
+	if err := packageData.AnnotateGitURLs(); err != nil {
+		return "", err
+	}
+	m := packageData.ToGitMap()
+	out := []string{}
+	for _, pkg := range m {
+		out = append(out, pkg.ToBuildRule(m))
+	}
+	sort.Strings(out)
+	return strings.Join(out, "\n"), nil
 }
 
 // goCommand runs a Go command and returns its output.
@@ -70,7 +84,7 @@ func goCommand(gotool string, command, flag string, packages ...string) ([]byte,
 		}
 		gotool = path
 	}
-	log.Notice("Running %s %s %s %s...", gotool, command, flag, strings.Join(packages, " "))
+	log.Debug("Running %s %s %s %s...", gotool, command, flag, strings.Join(packages, " "))
 	args := append([]string{command, flag}, packages...)
 	cmd := exec.Command(gotool, args...)
 	return cmd.Output()
@@ -105,12 +119,14 @@ type jsonPackage struct {
 	Deps         []string
 
 	// GitURL is not in the upstream structure. We annotate it ourselves later.
-	GitURL string
+	GitURL      string
+	Revision    string
+	RepoImports map[string]bool
 }
 
 // ToShortFormatString returns a short delimited string format that Please will re-parse later
 // to create a build rule from.
-func (jp jsonPackage) ToShortFormatString(packages map[string]jsonPackage) string {
+func (jp *jsonPackage) ToShortFormatString(packages map[string]*jsonPackage) string {
 	comma := func(s []string) string { return strings.Join(s, ",") }
 	caret := func(s []string) string { return strings.Join(s, "^") }
 
@@ -131,19 +147,22 @@ func (jp jsonPackage) ToShortFormatString(packages map[string]jsonPackage) strin
 }
 
 // ToBuildRule returns a build rule representation suitable for copying into a BUILD file.
-func (jp jsonPackage) ToBuildRule(packages map[string]jsonPackage) string {
-	name := strings.Replace(jp.ImportPath, "/", "_", -1)
-	deps := jp.deps(packages)
-	return fmt.Sprintf(template, name, jp.GitURL, strings.Join(deps, "',\n        '"))
+func (jp *jsonPackage) ToBuildRule(packages map[string]*jsonPackage) string {
+	name := repoNameToRuleName(jp.GitURL)
+	deps := jp.repoDeps(packages)
+	if len(deps) == 0 {
+		return fmt.Sprintf(noDepsTemplate, name, jp.GitURL, jp.Revision)
+	}
+	return fmt.Sprintf(template, name, jp.GitURL, jp.Revision, strings.Join(deps, "',\n        '"))
 }
 
 // trimRoot strips the root from the given string.
-func (jp jsonPackage) trimRoot(s string) string {
+func (jp *jsonPackage) trimRoot(s string) string {
 	return strings.TrimLeft(strings.TrimPrefix(s, jp.Root), "/")
 }
 
 // paths updates a sequence of paths with the given prefix.
-func (jp jsonPackage) paths(dir string, ps []string) []string {
+func (jp *jsonPackage) paths(dir string, ps []string) []string {
 	for i, p := range ps {
 		ps[i] = path.Join(dir, p)
 	}
@@ -151,7 +170,7 @@ func (jp jsonPackage) paths(dir string, ps []string) []string {
 }
 
 // deps returns the non-system dependencies for this package.
-func (jp jsonPackage) deps(packages map[string]jsonPackage) []string {
+func (jp *jsonPackage) deps(packages map[string]*jsonPackage) []string {
 	ret := make([]string, 0, len(jp.Imports))
 	for _, imp := range jp.Imports {
 		if pkg, present := packages[imp]; present && !pkg.Standard {
@@ -161,19 +180,49 @@ func (jp jsonPackage) deps(packages map[string]jsonPackage) []string {
 	return ret
 }
 
+// repoDeps returns the non-system dependencies that we have build rules for.
+func (jp *jsonPackage) repoDeps(packages map[string]*jsonPackage) []string {
+	ret := make([]string, 0, len(jp.RepoImports))
+	for dep := range jp.RepoImports {
+		if pkg, present := packages[dep]; present && !pkg.Standard {
+			if dep != jp.GitURL {
+				ret = append(ret, ":"+repoNameToRuleName(dep))
+			}
+		}
+	}
+	sort.Strings(ret)
+	return ret
+}
+
+// repoNameToRuleName converts a git repo name into a name suitable for a build rule.
+func repoNameToRuleName(repoName string) string {
+	return strings.TrimSuffix(repoName[strings.LastIndex(repoName, "/")+1:], ".git")
+}
+
 // FindGitURL finds the upstream Git URL of this package.
-func (jp jsonPackage) FindGitURL() (string, error) {
+func (jp *jsonPackage) AnnotateGitURL() error {
+	log.Debug("Running git config --get remote.origin.url in %s...", jp.Dir)
 	cmd := exec.Command("git", "config", "--get", "remote.origin.url")
 	cmd.Dir = jp.Dir
 	out, err := cmd.Output()
 	if err != nil {
-		return "", err
+		// We need a bit of verbosity here so we don't just get 'exit status 1'
+		return fmt.Errorf("%s in %s: %s", err, jp.Dir, string(out))
 	}
 	// Strip https:// prefix for more natural Go paths. We can assume it again later.
-	return strings.TrimPrefix("https://", string(out)), nil
+	jp.GitURL = strings.TrimSpace(strings.TrimPrefix(string(out), "https://"))
+	log.Debug("Running %s in %s...", "git log -n 1 --pretty=format:'%H'", jp.Dir)
+	cmd = exec.Command("git", "log", "-n", "1", "--pretty=format:'%H'")
+	cmd.Dir = jp.Dir
+	out, err = cmd.Output()
+	if err != nil {
+		return fmt.Errorf("%s: %s", err, jp.Dir, string(out))
+	}
+	jp.Revision = strings.Trim(string(out), "'")
+	return nil
 }
 
-type jsonPackages []jsonPackage
+type jsonPackages []*jsonPackage
 
 // UniqueDeps returns the unique set of deps from a set of packages.
 func (jps jsonPackages) UniqueDeps() []string {
@@ -192,10 +241,33 @@ func (jps jsonPackages) UniqueDeps() []string {
 }
 
 // ToMap converts the jsonPackages slice to a map of package import path -> package.
-func (jps jsonPackages) ToMap() map[string]jsonPackage {
-	m := make(map[string]jsonPackage, len(jps))
+func (jps jsonPackages) ToMap() map[string]*jsonPackage {
+	m := make(map[string]*jsonPackage, len(jps))
 	for _, jp := range jps {
 		m[jp.ImportPath] = jp
+	}
+	return m
+}
+
+// ToGitMap converts the jsonPackages slice to a map of git repo -> representative package.
+func (jps jsonPackages) ToGitMap() map[string]*jsonPackage {
+	byImport := jps.ToMap()
+	m := map[string]*jsonPackage{}
+	for _, jp := range jps {
+		if jp.GitURL == "" {
+			continue
+		}
+		p, present := m[jp.GitURL]
+		if !present {
+			m[jp.GitURL] = jp
+			p = jp
+			p.RepoImports = map[string]bool{}
+		}
+		for _, imp := range jp.Imports {
+			if existing, present := byImport[imp]; present {
+				p.RepoImports[existing.GitURL] = true
+			}
+		}
 	}
 	return m
 }
@@ -206,12 +278,11 @@ func (jps jsonPackages) AnnotateGitURLs() error {
 	var wg sync.WaitGroup
 	wg.Add(len(jps))
 	for i, jp := range jps {
-		go func(i int, jp jsonPackage) {
-			url, e := jp.FindGitURL()
-			if e != nil {
-				err = e
-			} else {
-				jps[i].GitURL = url
+		go func(i int, jp *jsonPackage) {
+			if !jp.Standard {
+				if e := jp.AnnotateGitURL(); e != nil {
+					err = e
+				}
 			}
 			wg.Done()
 		}(i, jp)

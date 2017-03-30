@@ -8,8 +8,8 @@ import (
 
 func TestUniqueDeps(t *testing.T) {
 	jps := jsonPackages{
-		{Deps: []string{"net", "net/http", "sync", "archive/tar"}},
-		{Deps: []string{"archive/tar", "archive/zip"}},
+		&jsonPackage{Deps: []string{"net", "net/http", "sync", "archive/tar"}},
+		&jsonPackage{Deps: []string{"archive/tar", "archive/zip"}},
 	}
 	expected := []string{"archive/tar", "archive/zip", "net", "net/http", "sync"}
 	assert.Equal(t, expected, jps.UniqueDeps())
@@ -17,14 +17,27 @@ func TestUniqueDeps(t *testing.T) {
 
 func TestToMap(t *testing.T) {
 	jps := jsonPackages{
-		{ImportPath: "github.com/thought-machine/please/tools"},
-		{ImportPath: "github.com/thought-machine/please/src"},
+		&jsonPackage{ImportPath: "github.com/thought-machine/please/tools"},
+		&jsonPackage{ImportPath: "github.com/thought-machine/please/src"},
 	}
-	expected := map[string]jsonPackage{
-		"github.com/thought-machine/please/tools": {ImportPath: "github.com/thought-machine/please/tools"},
-		"github.com/thought-machine/please/src":   {ImportPath: "github.com/thought-machine/please/src"},
+	expected := map[string]*jsonPackage{
+		"github.com/thought-machine/please/tools": &jsonPackage{ImportPath: "github.com/thought-machine/please/tools"},
+		"github.com/thought-machine/please/src":   &jsonPackage{ImportPath: "github.com/thought-machine/please/src"},
 	}
 	assert.Equal(t, expected, jps.ToMap())
+}
+
+func TestToGitMap(t *testing.T) {
+	jps := jsonPackages{}
+	assert.NoError(t, jps.FromJSON([]byte(samplePackages)))
+	jps[0].GitURL = "github.com/thought-machine/please"
+	jps[1].GitURL = "github.com/thought-machine/please"
+	jps[2].GitURL = "github.com/thought-machine/pleasings"
+	expected := map[string]*jsonPackage{
+		"github.com/thought-machine/please":    jps[0],
+		"github.com/thought-machine/pleasings": jps[2],
+	}
+	assert.Equal(t, expected, jps.ToGitMap())
 }
 
 func TestToShortFormatString(t *testing.T) {
@@ -39,6 +52,40 @@ func TestToShortFormatStringCgo(t *testing.T) {
 	assert.NoError(t, jps.FromJSON([]byte(samplePackages)))
 	expected := "parse|src/parse|builtin_rules.go,parse_step.go,suggest.go|interpreter.go|interpreter.c|interpreter.h|--std=c99^-Werror|-ldl|core\n"
 	assert.Equal(t, expected, jps[2].ToShortFormatString(jps.ToMap()))
+}
+
+func TestRepoNameToRuleName(t *testing.T) {
+	assert.Equal(t, "please", repoNameToRuleName("github.com/thought-machine/please"))
+	assert.Equal(t, "please", repoNameToRuleName("github.com/thought-machine/please.git"))
+}
+
+func TestToBuildRule(t *testing.T) {
+	jps := jsonPackages{}
+	assert.NoError(t, jps.FromJSON([]byte(samplePackages)))
+	jps[0].GitURL = "github.com/thought-machine/please"
+	jps[1].GitURL = "github.com/thought-machine/please"
+	jps[2].GitURL = "github.com/thought-machine/pleasings"
+	jps[0].Revision = "cf4e57e3bc210d18d3e6caedb7db6b57655e2be8"
+	jps[1].Revision = "cf4e57e3bc210d18d3e6caedb7db6b57655e2be8"
+	jps[2].Revision = "b916153623b843b3b4a34854bfd5ecb4577c083f"
+	jps[2].Imports = append(jps[2].Imports, "github.com/thought-machine/please")
+	expected1 := `go_remote_library(
+    name = 'please',
+    url = 'github.com/thought-machine/please',
+    revision = 'cf4e57e3bc210d18d3e6caedb7db6b57655e2be8',
+)
+`
+	expected2 := `go_remote_library(
+    name = 'pleasings',
+    url = 'github.com/thought-machine/pleasings',
+    revision = 'b916153623b843b3b4a34854bfd5ecb4577c083f',
+    deps = [
+        ':please',
+    ],
+)
+`
+	assert.Equal(t, expected1, jps[0].ToBuildRule(jps.ToGitMap()))
+	assert.Equal(t, expected2, jps[2].ToBuildRule(jps.ToGitMap()))
 }
 
 const samplePackages = `
