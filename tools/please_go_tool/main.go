@@ -8,7 +8,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 
 	"gopkg.in/op/go-logging.v1"
 
@@ -21,11 +20,11 @@ var log = logging.MustGetLogger("plz_go_test")
 
 var opts = struct {
 	Usage     string
-	Dir       string `short:"d" long:"dir" description:"Directory to search for Go package files for coverage"`
 	Verbosity int    `short:"v" long:"verbose" default:"2" description:"Verbosity of output (higher number = more output, default 2 -> notice, warnings and errors only)"`
 	Go        string `short:"g" long:"go" default:"go" description:"Go binary to run"`
 
 	TestMain struct {
+		Dir     string   `short:"d" long:"dir" description:"Directory to search for Go package files for coverage"`
 		Exclude []string `short:"x" long:"exclude" default:"third_party/go" description:"Directories to exclude from search"`
 		Output  string   `short:"o" long:"output" description:"Output filename" required:"true"`
 		Package string   `short:"p" long:"package" description:"Package containing this test" env:"PKG"`
@@ -35,9 +34,9 @@ var opts = struct {
 	} `command:"testmain" description:"Templates a test main."`
 
 	Remote struct {
-		Args struct {
-			ShortFormat bool     `short:"s" long:"short_format" description:"Prints a shorter format that is used for deriving individual generated rules."`
-			Packages    []string `positional-arg-name:"packages" description:"Packages to fetch" required:"true"`
+		ShortFormat bool `short:"s" long:"short_format" description:"Prints a shorter format that is used for deriving individual generated rules."`
+		Args        struct {
+			Packages []string `positional-arg-name:"packages" description:"Packages to fetch" required:"true"`
 		} `positional-args:"true" required:"true"`
 	} `command:"remote" description:"Gets and prints some remote libraries."`
 }{
@@ -60,15 +59,15 @@ func main() {
 	cli.InitLogging(opts.Verbosity)
 
 	if parser.Active.Name == "testmain" {
-		coverVars, err := testmain.FindCoverVars(opts.Dir, opts.Exclude, opts.Args.Sources)
+		coverVars, err := testmain.FindCoverVars(opts.TestMain.Dir, opts.TestMain.Exclude, opts.TestMain.Args.Sources)
 		if err != nil {
 			log.Fatalf("Error scanning for coverage: %s", err)
 		}
-		if err = testmain.WriteTestMain(opts.Package, testmain.IsVersion18(opts.Args.Go), opts.Args.Sources, opts.Output, coverVars); err != nil {
+		if err = testmain.WriteTestMain(opts.TestMain.Package, testmain.IsVersion18(opts.Go), opts.TestMain.Args.Sources, opts.TestMain.Output, coverVars); err != nil {
 			log.Fatalf("Error writing test main: %s", err)
 		}
 	} else if parser.Active.Name == "remote" {
-		s, err := remote.FetchLibraries(opts.Go, opts.Remote.ShortFormat, opts.Remote.Packages...)
+		s, err := remote.FetchLibraries(opts.Go, opts.Remote.ShortFormat, opts.Remote.Args.Packages...)
 		if err != nil {
 			log.Fatalf("%s\n", err)
 		}

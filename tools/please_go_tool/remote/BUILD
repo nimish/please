@@ -1,6 +1,6 @@
 go_library(
-    name = 'goget',
-    srcs = ['goget.go'],
+    name = 'remote',
+    srcs = ['remote.go'],
     deps = [
         '//third_party/go:logging',
     ],
@@ -8,10 +8,10 @@ go_library(
 )
 
 go_test(
-    name = 'goget_test',
-    srcs = ['goget_test.go'],
+    name = 'remote_test',
+    srcs = ['remote_test.go'],
     deps = [
-        ':goget',
+        ':remote',
         '//third_party/go:testify',
     ],
 )

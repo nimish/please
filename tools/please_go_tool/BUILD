@@ -4,6 +4,7 @@ go_binary(
     deps = [
         '//src/cli',
         '//third_party/go:logging',
+        '//tools/please_go_tool/remote',
         '//tools/please_go_tool/testmain',
     ],
     visibility = ['PUBLIC'],

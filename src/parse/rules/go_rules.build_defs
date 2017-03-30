@@ -346,9 +346,9 @@ def go_test(name, srcs, data=None, deps=None, visibility=None, flags='', contain
         outs=[name + '_main.go'],
         deps=deps,
         cmd={
-            'dbg': '$TOOLS -o $OUT $SRCS',
-            'opt': '$TOOLS -o $OUT $SRCS',
-            'cover': '$TOOLS -d . -o $OUT $SRCS ',
+            'dbg': '$TOOL1 -g $TOOL2 testmain -o $OUT $SRCS',
+            'opt': '$TOOL1 -g $TOOL2 testmain -o $OUT $SRCS',
+            'cover': '$TOOL1 -g $TOOL2 testmain -d . -o $OUT $SRCS ',
         },
         needs_transitive_deps=True,  # Need all .a files to template coverage variables
         requires=['go'],

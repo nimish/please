@@ -1,6 +1,6 @@
-// Package goget implements a helper for 'go get' to facilitate breaking it up
+// Package remote implements a helper for 'go get' to facilitate breaking it up
 // into separate plz targets.
-package goget
+package remote
 
 import (
 	"bytes"
@@ -15,7 +15,7 @@ import (
 	"gopkg.in/op/go-logging.v1"
 )
 
-var log = logging.MustGetLogger("goget")
+var log = logging.MustGetLogger("remote")
 
 const template = `
 go_remote_library(
