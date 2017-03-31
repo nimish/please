@@ -71,13 +71,13 @@ func TestToBuildRule(t *testing.T) {
 	jps[2].Imports = append(jps[2].Imports, "github.com/thought-machine/please")
 	expected1 := `go_remote_library(
     name = 'please',
-    url = 'github.com/thought-machine/please',
+    get = 'github.com/thought-machine/please',
     revision = 'cf4e57e3bc210d18d3e6caedb7db6b57655e2be8',
 )
 `
 	expected2 := `go_remote_library(
     name = 'pleasings',
-    url = 'github.com/thought-machine/pleasings',
+    get = 'github.com/thought-machine/pleasings',
     revision = 'b916153623b843b3b4a34854bfd5ecb4577c083f',
     deps = [
         ':please',

@@ -19,7 +19,7 @@ var log = logging.MustGetLogger("remote")
 
 const template = `go_remote_library(
     name = '%s',
-    url = '%s',
+    get = '%s',
     revision = '%s',
     deps = [
         '%s',
@@ -28,7 +28,7 @@ const template = `go_remote_library(
 `
 const noDepsTemplate = `go_remote_library(
     name = '%s',
-    url = '%s',
+    get = '%s',
     revision = '%s',
 )
 `
