@@ -54,6 +54,9 @@ func FetchLibraries(gotool string, shortFormat bool, packages ...string) (string
 	}
 	// Now build up the response.
 	if shortFormat {
+		// This orders the dependencies such that dependors come after dependees, which
+		// is important when we generate the build rules later.
+		sort.Sort(packageData)
 		var buf bytes.Buffer
 		m := packageData.ToMap()
 		for _, pkg := range packageData {
@@ -130,7 +133,7 @@ func (jp *jsonPackage) ToShortFormatString(packages map[string]*jsonPackage) str
 	comma := func(s []string) string { return strings.Join(s, ",") }
 	caret := func(s []string) string { return strings.Join(s, "^") }
 
-	name := strings.Replace(jp.ImportPath, "/", "_", -1)
+	name := strings.Replace(strings.Replace(jp.ImportPath, "/", "_", -1), ".", "_", -1)
 	dir := jp.trimRoot(jp.Dir)
 	gofiles := comma(jp.GoFiles)
 	deps := comma(jp.deps(packages))
@@ -222,6 +225,16 @@ func (jp *jsonPackage) AnnotateGitURL() error {
 	return nil
 }
 
+// HasDep returns true if this package has a dependency on the given package.
+func (jp *jsonPackage) HasDep(dep string) bool {
+	for _, d := range jp.Deps {
+		if d == dep {
+			return true
+		}
+	}
+	return false
+}
+
 type jsonPackages []*jsonPackage
 
 // UniqueDeps returns the unique set of deps from a set of packages, including the packages themselves..
@@ -299,4 +312,12 @@ func (jps *jsonPackages) FromJSON(data []byte) error {
 	d := append([]byte{'['}, bytes.Replace(data, []byte("}\n{"), []byte("},{"), -1)...)
 	d = append(d, ']')
 	return json.Unmarshal(d, jps)
+}
+
+func (jps jsonPackages) Len() int { return len(jps) }
+func (jps jsonPackages) Less(i, j int) bool {
+	return !jps[i].HasDep(jps[j].ImportPath) && (jps[j].HasDep(jps[i].ImportPath) || jps[i].ImportPath < jps[j].ImportPath)
+}
+func (jps jsonPackages) Swap(i, j int) {
+	jps[i], jps[j] = jps[j], jps[i]
 }

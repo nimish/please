@@ -550,7 +550,7 @@ def _define_go_libraries(rule_name, output):
             # Simple go_library rule.
             name, dir, gofiles, deps = parts
             new_rule = go_library(
-                name = '_%s#%s' % (parent_rule, name.replace('.', '_')),
+                name = '_%s#%s' % (parent_rule, name),
                 srcs = _remote_lib_files(rule_name, gofiles, dir),
                 deps = [':' + dep for dep in deps.split(',')] if deps else None,
             )
@@ -558,7 +558,7 @@ def _define_go_libraries(rule_name, output):
             # More complex cgo_library rule
             name, dir, gofiles, cgofiles, cfiles, hfiles, cflags, ldflags, deps = parts
             new_rule = cgo_library(
-                name = '_%s#%s' % (parent_rule, name.replace('.', '_')),
+                name = '_%s#%s' % (parent_rule, name),
                 srcs = _remote_lib_files(rule_name, cgofiles, dir),
                 go_srcs = _remote_lib_files(rule_name, gofiles, dir),
                 c_srcs = _remote_lib_files(rule_name, cfiles, dir),

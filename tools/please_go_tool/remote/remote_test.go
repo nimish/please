@@ -1,6 +1,7 @@
 package remote
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -86,6 +87,43 @@ func TestToBuildRule(t *testing.T) {
 `
 	assert.Equal(t, expected1, jps[0].ToBuildRule(jps.ToGitMap()))
 	assert.Equal(t, expected2, jps[2].ToBuildRule(jps.ToGitMap()))
+}
+
+func TestJsonPackagesSort(t *testing.T) {
+	jps := jsonPackages{
+		&jsonPackage{
+			ImportPath: "gopkg.in/gcfg.v1",
+			Deps: []string{
+				"gopkg.in/gcfg.v1/scanner",
+				"gopkg.in/gcfg.v1/token",
+				"gopkg.in/gcfg.v1/types",
+				"gopkg.in/warnings.v0",
+			},
+		},
+		&jsonPackage{
+			ImportPath: "gopkg.in/gcfg.v1/scanner",
+			Deps: []string{
+				"gopkg.in/gcfg.v1/token",
+			},
+		},
+		&jsonPackage{
+			ImportPath: "gopkg.in/gcfg.v1/token",
+		},
+		&jsonPackage{
+			ImportPath: "gopkg.in/gcfg.v1/types",
+		},
+		&jsonPackage{
+			ImportPath: "gopkg.in/warnings.v0",
+		},
+	}
+	assert.False(t, jps.Less(0, 1))
+	assert.True(t, jps.Less(1, 0))
+	sort.Sort(jps)
+	assert.Equal(t, "gopkg.in/gcfg.v1/token", jps[0].ImportPath)
+	assert.Equal(t, "gopkg.in/gcfg.v1/scanner", jps[1].ImportPath)
+	assert.Equal(t, "gopkg.in/gcfg.v1/types", jps[2].ImportPath)
+	assert.Equal(t, "gopkg.in/warnings.v0", jps[3].ImportPath)
+	assert.Equal(t, "gopkg.in/gcfg.v1", jps[4].ImportPath)
 }
 
 const samplePackages = `
