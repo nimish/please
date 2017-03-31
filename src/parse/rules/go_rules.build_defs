@@ -531,6 +531,7 @@ def go_remote_library(name, get, revision=None, hashes=None, visibility=None, de
         hashes = hashes,
         post_build = _define_go_libraries,
         tools = tools,
+        building_description = 'Fetching...',
     )
     filegroup(
         name = name,

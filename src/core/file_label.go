@@ -29,6 +29,10 @@ func (label FileLabel) Label() *BuildLabel {
 	return nil
 }
 
+func (label FileLabel) nonOutputLabel() *BuildLabel {
+	return nil
+}
+
 func (label FileLabel) String() string {
 	return label.File
 }
@@ -51,6 +55,10 @@ func (label SystemFileLabel) LocalPaths(graph *BuildGraph) []string {
 }
 
 func (label SystemFileLabel) Label() *BuildLabel {
+	return nil
+}
+
+func (label SystemFileLabel) nonOutputLabel() *BuildLabel {
 	return nil
 }
 
@@ -78,6 +86,10 @@ func (label BuildOutputLabel) LocalPaths(graph *BuildGraph) []string {
 
 func (label BuildOutputLabel) Label() *BuildLabel {
 	return &label.BuildLabel
+}
+
+func (label BuildOutputLabel) nonOutputLabel() *BuildLabel {
+	return nil
 }
 
 func (label BuildOutputLabel) String() string {
