@@ -570,13 +570,8 @@ def _define_go_libraries(rule_name, output):
 
 
 def _remote_lib_files(rule_name, files, dir):
-    """Collects a subset of files from another rule.
-
-    TODO(pebers): As mentioned in several other places, these intermediate rules are tedious
-                  and not very performant. It would be more elegant to be able to declare that
-                  we want a specific subset of outputs from another rule.
-    """
-
+    """Collects a subset of files from another rule."""
+    return ['%s|%s/%s' % (rule_name, dir, file) for file in files.split(',')]
 
 
 def go_yacc(name, src, out=None, visibility=None, labels=None):
