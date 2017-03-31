@@ -516,10 +516,11 @@ def go_remote_library(name, get, revision=None, hashes=None, visibility=None, de
     if hashes and not revision:
         raise ParseError('You must pass revision to go_remote_library if you pass hashes')
 
+    _, tools = _tool_path(CONFIG.GO_TEST_TOOL, _GO_TOOL)
     cmd = ' && '.join([
         'export GOPATH=$TMP_DIR',
-        'git clone %s $OUT' % get,
-        '(cd $OUT && git checkout %s && rm -rf .git)' % revision if revision else '(cd $OUT rm -rf .git)',
+        'git clone https://%s $OUT' % get,
+        '(cd $OUT && git checkout -q %s && rm -rf .git)' % revision if revision else '(cd $OUT rm -rf .git)',
         '$TOOL1 remote -g $TOOL2 -s ' + get,
     ])
     git_rule = build_rule(
@@ -529,8 +530,9 @@ def go_remote_library(name, get, revision=None, hashes=None, visibility=None, de
         cmd = cmd,
         hashes = hashes,
         post_build = _define_go_libraries,
+        tools = tools,
     )
-    build_rule(
+    filegroup(
         name = name,
         visibility = visibility,
         exported_deps = deps,
@@ -547,31 +549,31 @@ def _define_go_libraries(rule_name, output):
             # Simple go_library rule.
             name, dir, gofiles, deps = parts
             new_rule = go_library(
-                name = name,
+                name = '_%s#%s' % (parent_rule, name.replace('.', '_')),
                 srcs = _remote_lib_files(rule_name, gofiles, dir),
-                deps = [':' + dep for dep in deps,split(',')],
+                deps = [':' + dep for dep in deps.split(',')] if deps else None,
             )
         elif len(parts) == 9:
             # More complex cgo_library rule
             name, dir, gofiles, cgofiles, cfiles, hfiles, cflags, ldflags, deps = parts
             new_rule = cgo_library(
-                name = name,
+                name = '_%s#%s' % (parent_rule, name.replace('.', '_')),
                 srcs = _remote_lib_files(rule_name, cgofiles, dir),
                 go_srcs = _remote_lib_files(rule_name, gofiles, dir),
                 c_srcs = _remote_lib_files(rule_name, cfiles, dir),
                 hdrs = _remote_lib_files(rule_name, hfiles, dir),
                 compiler_flags = cflags.split('^'),
                 linker_flags = ldflags.split('^'),
-                deps = [':' + dep for dep in deps,split(',')],
+                deps = [':' + dep for dep in deps.split(',')] if deps else None,
             )
         else:
             raise ValueError('Unknown format returned from please_go_tool: ' + line)
-        add_dep(parent_rule, new_rule)
+        add_exported_dep(parent_rule, new_rule)
 
 
 def _remote_lib_files(rule_name, files, dir):
     """Collects a subset of files from another rule."""
-    return ['%s|%s/%s' % (rule_name, dir, file) for file in files.split(',')]
+    return [':%s|%s/%s' % (rule_name, dir, file) for file in files.split(',')] if files else None
 
 
 def go_yacc(name, src, out=None, visibility=None, labels=None):

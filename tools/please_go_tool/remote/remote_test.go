@@ -8,10 +8,10 @@ import (
 
 func TestUniqueDeps(t *testing.T) {
 	jps := jsonPackages{
-		&jsonPackage{Deps: []string{"net", "net/http", "sync", "archive/tar"}},
-		&jsonPackage{Deps: []string{"archive/tar", "archive/zip"}},
+		&jsonPackage{ImportPath: "core", Deps: []string{"net", "net/http", "sync", "archive/tar"}},
+		&jsonPackage{ImportPath: "jarcat", Deps: []string{"archive/tar", "archive/zip"}},
 	}
-	expected := []string{"archive/tar", "archive/zip", "net", "net/http", "sync"}
+	expected := []string{"archive/tar", "archive/zip", "core", "jarcat", "net", "net/http", "sync"}
 	assert.Equal(t, expected, jps.UniqueDeps())
 }
 

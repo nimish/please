@@ -224,13 +224,14 @@ func (jp *jsonPackage) AnnotateGitURL() error {
 
 type jsonPackages []*jsonPackage
 
-// UniqueDeps returns the unique set of deps from a set of packages.
+// UniqueDeps returns the unique set of deps from a set of packages, including the packages themselves..
 func (jps jsonPackages) UniqueDeps() []string {
 	m := map[string]struct{}{}
 	for _, jp := range jps {
 		for _, dep := range jp.Deps {
 			m[dep] = struct{}{}
 		}
+		m[jp.ImportPath] = struct{}{}
 	}
 	ret := make([]string, 0, len(m))
 	for pkg := range m {
