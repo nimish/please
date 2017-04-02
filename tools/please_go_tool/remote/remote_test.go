@@ -70,6 +70,7 @@ func TestToBuildRule(t *testing.T) {
 	jps[1].Revision = "cf4e57e3bc210d18d3e6caedb7db6b57655e2be8"
 	jps[2].Revision = "b916153623b843b3b4a34854bfd5ecb4577c083f"
 	jps[2].Imports = append(jps[2].Imports, "github.com/thought-machine/please")
+	originalPackages := []string{"github.com/thought-machine/please", "github.com/thought-machine/pleasings/grm"}
 	expected1 := `go_remote_library(
     name = 'please',
     get = 'github.com/thought-machine/please',
@@ -79,14 +80,17 @@ func TestToBuildRule(t *testing.T) {
 	expected2 := `go_remote_library(
     name = 'pleasings',
     get = 'github.com/thought-machine/pleasings',
+    packages = [
+        'grm',
+    ],
     revision = 'b916153623b843b3b4a34854bfd5ecb4577c083f',
     deps = [
         ':please',
     ],
 )
 `
-	assert.Equal(t, expected1, jps[0].ToBuildRule(jps.ToGitMap()))
-	assert.Equal(t, expected2, jps[2].ToBuildRule(jps.ToGitMap()))
+	assert.Equal(t, expected1, jps[0].ToBuildRule(jps.ToGitMap(), originalPackages))
+	assert.Equal(t, expected2, jps[2].ToBuildRule(jps.ToGitMap(), originalPackages))
 }
 
 func TestJsonPackagesSort(t *testing.T) {

@@ -494,7 +494,8 @@ def go_get(name, get=None, outs=None, deps=None, exported_deps=None, visibility=
     )
 
 
-def go_remote_library(name, get, revision=None, hashes=None, visibility=None, deps=None):
+def go_remote_library(name, get, packages=None, revision=None, hashes=None,
+                      visibility=None, deps=None):
     """Defines a rule to fetch Go dependencies from remote Git repositories.
 
     This is akin to go get but only works on a single Git repo; dependencies must be
@@ -507,6 +508,8 @@ def go_remote_library(name, get, revision=None, hashes=None, visibility=None, de
       name (str): Name of the rule.
       get (str): The location to fetch from, as a URL (minus protocol, i.e. the same as a typical
                  go get request).
+      packages (list): The list of packages to fetch / build within the repository (without the
+                       leading repository itself). If not given the root of the repo is assumed.
       revision (str): Git revision (or tag) to check out. If not given master is used.
       hashes (list): Hashes to verify the rule output with. You should specify revision if you
                      pass this, since otherwise it will break as soon as master updates.
@@ -517,11 +520,12 @@ def go_remote_library(name, get, revision=None, hashes=None, visibility=None, de
         raise ParseError('You must pass revision to go_remote_library if you pass hashes')
 
     _, tools = _tool_path(CONFIG.GO_TEST_TOOL, _GO_TOOL)
+    build = ' '.join(get + pkg for pkg in packages) if packages else get
     cmd = ' && '.join([
         'export GOPATH=$TMP_DIR',
         'git clone https://%s $OUT' % get,
         '(cd $OUT && git checkout -q %s && rm -rf .git)' % revision if revision else '(cd $OUT rm -rf .git)',
-        '$TOOL1 remote -g $TOOL2 -s ' + get,
+        '$TOOL1 remote -g $TOOL2 -s ' + build,
     ])
     git_rule = build_rule(
         name = name,
@@ -531,6 +535,7 @@ def go_remote_library(name, get, revision=None, hashes=None, visibility=None, de
         hashes = hashes,
         post_build = _define_go_libraries,
         tools = tools,
+        deps = deps,
         building_description = 'Fetching...',
     )
     filegroup(

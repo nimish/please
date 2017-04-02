@@ -6,32 +6,33 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os/exec"
 	"path"
 	"sort"
 	"strings"
 	"sync"
+	"text/template"
 
 	"gopkg.in/op/go-logging.v1"
 )
 
 var log = logging.MustGetLogger("remote")
 
-const template = `go_remote_library(
-    name = '%s',
-    get = '%s',
-    revision = '%s',
-    deps = [
-        '%s',
-    ],
+// The following could be cleaner if we were to use the {{- whitespace-cleaning syntax,
+// but that would drop support for some older Go versions. One day.
+var ruleTemplate = template.Must(template.New("rule").Parse(`go_remote_library(
+    name = '{{ .RuleName }}',
+    get = '{{ .GitURL }}',{{ with $pkgs := .Packages }}{{ if $pkgs }}
+    packages = [{{ range $i, $pkg := $pkgs }}
+        '{{ $pkg }}',
+{{ end }}    ],{{ end }}{{ end }}
+    revision = '{{ .Revision }}',{{ with $deps := .RepoDeps }}{{ if $deps }}
+    deps = [{{ range $i, $dep := $deps }}
+        '{{ $dep }}',{{ end }}
+    ],{{ end }}{{ end }}
 )
-`
-const noDepsTemplate = `go_remote_library(
-    name = '%s',
-    get = '%s',
-    revision = '%s',
-)
-`
+`))
 
 // FetchLibraries uses 'go get' to fetch a series of libraries, and generate either a sequence of
 // build rules describing them or a pithy description of them which can be parsed back
@@ -74,7 +75,7 @@ func FetchLibraries(gotool string, shortFormat bool, packages ...string) (string
 	m := packageData.ToGitMap()
 	out := []string{}
 	for _, pkg := range m {
-		out = append(out, pkg.ToBuildRule(m))
+		out = append(out, pkg.ToBuildRule(m, packages))
 	}
 	sort.Strings(out)
 	return strings.Join(out, "\n"), nil
@@ -92,7 +93,19 @@ func goCommand(gotool string, command, flag string, packages ...string) ([]byte,
 	log.Debug("Running %s %s %s %s...", gotool, command, flag, strings.Join(packages, " "))
 	args := append([]string{command, flag}, packages...)
 	cmd := exec.Command(gotool, args...)
-	return cmd.CombinedOutput()
+	// Need to read stdout and stderr separately for decent output
+	stdout, _ := cmd.StdoutPipe()
+	stderr, _ := cmd.StderrPipe()
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
+	out1, _ := ioutil.ReadAll(stdout)
+	out2, _ := ioutil.ReadAll(stderr)
+	if err := cmd.Wait(); err != nil {
+		// Often we need to see stderr to debug it ("exit status 1" isn't very useful...)
+		return nil, fmt.Errorf("%s: %s", err, string(out2))
+	}
+	return out1, nil
 }
 
 // goList runs "go list -json" on the given packages and parses it to a struct.
@@ -124,9 +137,11 @@ type jsonPackage struct {
 	Deps         []string
 
 	// GitURL is not in the upstream structure. We annotate it ourselves later.
-	GitURL      string
-	Revision    string
-	RepoImports map[string]bool
+	GitURL           string
+	Revision         string
+	RepoImports      map[string]bool
+	packages         map[string]*jsonPackage
+	originalPackages []string
 }
 
 // ToShortFormatString returns a short delimited string format that Please will re-parse later
@@ -152,13 +167,14 @@ func (jp *jsonPackage) ToShortFormatString(packages map[string]*jsonPackage) str
 }
 
 // ToBuildRule returns a build rule representation suitable for copying into a BUILD file.
-func (jp *jsonPackage) ToBuildRule(packages map[string]*jsonPackage) string {
-	name := repoNameToRuleName(jp.GitURL)
-	deps := jp.repoDeps(packages)
-	if len(deps) == 0 {
-		return fmt.Sprintf(noDepsTemplate, name, jp.GitURL, jp.Revision)
+func (jp *jsonPackage) ToBuildRule(packages map[string]*jsonPackage, originalPackages []string) string {
+	jp.packages = packages
+	jp.originalPackages = originalPackages
+	var buf bytes.Buffer
+	if err := ruleTemplate.Execute(&buf, jp); err != nil {
+		log.Fatalf("%s\n", err)
 	}
-	return fmt.Sprintf(template, name, jp.GitURL, jp.Revision, strings.Join(deps, "',\n        '"))
+	return buf.String()
 }
 
 // trimRoot strips the root from the given string.
@@ -185,17 +201,33 @@ func (jp *jsonPackage) deps(packages map[string]*jsonPackage) []string {
 	return ret
 }
 
-// repoDeps returns the non-system dependencies that we have build rules for.
-func (jp *jsonPackage) repoDeps(packages map[string]*jsonPackage) []string {
+// RepoDeps returns the non-system dependencies that we have build rules for.
+func (jp *jsonPackage) RepoDeps() []string {
 	ret := make([]string, 0, len(jp.RepoImports))
 	for dep := range jp.RepoImports {
-		if pkg, present := packages[dep]; present && !pkg.Standard {
+		if pkg, present := jp.packages[dep]; present && !pkg.Standard {
 			if dep != jp.GitURL {
 				ret = append(ret, ":"+repoNameToRuleName(dep))
 			}
 		}
 	}
 	sort.Strings(ret)
+	return ret
+}
+
+// RuleName returns the name we'll use for the build rule.
+func (jp *jsonPackage) RuleName() string {
+	return repoNameToRuleName(jp.GitURL)
+}
+
+// Packages returns the set of packages we'll add to the BUILD rule declaration.
+func (jp *jsonPackage) Packages() []string {
+	ret := []string{}
+	for _, pkg := range jp.originalPackages {
+		if pkg != jp.GitURL && strings.HasPrefix(pkg, jp.GitURL) {
+			ret = append(ret, strings.TrimLeft(strings.TrimPrefix(pkg, jp.GitURL), "/"))
+		}
+	}
 	return ret
 }
 
