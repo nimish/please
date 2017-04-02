@@ -327,7 +327,7 @@ func (target *BuildTarget) Outputs() []string {
 		ret = make([]string, 0, len(target.Sources))
 		// Filegroups just re-output their inputs.
 		for _, src := range target.Sources {
-			if label := src.Label(); label == nil {
+			if label := src.nonOutputLabel(); label == nil {
 				ret = append(ret, src.LocalPaths(nil)[0])
 			} else {
 				for _, dep := range target.DependenciesFor(*label) {

@@ -552,7 +552,7 @@ def _define_go_libraries(rule_name, output):
             new_rule = go_library(
                 name = '_%s#%s' % (parent_rule, name),
                 srcs = _remote_lib_files(rule_name, gofiles, dir),
-                deps = [':' + dep for dep in deps.split(',')] if deps else None,
+                deps = _remote_lib_deps(parent_rule, deps),
             )
         elif len(parts) == 9:
             # More complex cgo_library rule
@@ -565,7 +565,7 @@ def _define_go_libraries(rule_name, output):
                 hdrs = _remote_lib_files(rule_name, hfiles, dir),
                 compiler_flags = cflags.split('^'),
                 linker_flags = ldflags.split('^'),
-                deps = [':' + dep for dep in deps.split(',')] if deps else None,
+                deps = _remote_lib_deps(parent_rule, deps),
             )
         else:
             raise ValueError('Unknown format returned from please_go_tool: ' + line)
@@ -575,6 +575,11 @@ def _define_go_libraries(rule_name, output):
 def _remote_lib_files(rule_name, files, dir):
     """Collects a subset of files from another rule."""
     return [':%s|%s/%s' % (rule_name, dir, file) for file in files.split(',')] if files else None
+
+
+def _remote_lib_deps(parent_rule, deps):
+    """Turns the build output into a list of dependencies."""
+    return [':_%s#%s' % (parent_rule, dep) for dep in deps.split(',')] if deps else None
 
 
 def go_yacc(name, src, out=None, visibility=None, labels=None):
