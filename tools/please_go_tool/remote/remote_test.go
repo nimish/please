@@ -89,8 +89,16 @@ func TestToBuildRule(t *testing.T) {
     ],
 )
 `
-	assert.Equal(t, expected1, jps[0].ToBuildRule(jps.ToGitMap(nil), nil, originalPackages))
-	assert.Equal(t, expected2, jps[2].ToBuildRule(jps.ToGitMap(nil), nil, originalPackages))
+	expected3 := `go_remote_library(
+    name = 'please',
+    get = 'github.com/thought-machine/please',
+    revision = 'cf4e57e3bc210d18d3e6caedb7db6b57655e2be8',
+    hashes = ['lKBCbo0yA9pUaMzwxiT5PLN2AeI'],
+)
+`
+	assert.Equal(t, expected1, jps[0].ToBuildRule(false, jps.ToGitMap(nil), nil, originalPackages))
+	assert.Equal(t, expected2, jps[2].ToBuildRule(false, jps.ToGitMap(nil), nil, originalPackages))
+	assert.Equal(t, expected3, jps[0].ToBuildRule(true, jps.ToGitMap(nil), nil, originalPackages))
 }
 
 func TestJsonPackagesSort(t *testing.T) {

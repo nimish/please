@@ -35,6 +35,7 @@ var opts = struct {
 
 	Remote struct {
 		ShortFormat bool `short:"s" long:"short_format" description:"Prints a shorter format that is used for deriving individual generated rules."`
+		Hashes      bool `short:"h" long:"hashes" description:"Adds hashes to the generated rules."`
 		Args        struct {
 			Packages []string `positional-arg-name:"packages" description:"Packages to fetch" required:"true"`
 		} `positional-args:"true" required:"true"`
@@ -67,7 +68,7 @@ func main() {
 			log.Fatalf("Error writing test main: %s", err)
 		}
 	} else if parser.Active.Name == "remote" {
-		s, err := remote.FetchLibraries(opts.Go, opts.Remote.ShortFormat, opts.Remote.Args.Packages...)
+		s, err := remote.FetchLibraries(opts.Go, opts.Remote.ShortFormat, opts.Remote.Hashes, opts.Remote.Args.Packages...)
 		if err != nil {
 			log.Fatalf("%s\n", err)
 		}
