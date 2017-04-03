@@ -495,7 +495,7 @@ def go_get(name, get=None, outs=None, deps=None, exported_deps=None, visibility=
     )
 
 
-def go_remote_library(name, get, packages=None, revision=None, hashes=None, strip=None,
+def go_remote_library(name, get, repo=None, packages=None, revision=None, hashes=None, strip=None,
                       visibility=None, deps=None, _binary=False):
     """Defines a rule to fetch Go dependencies from remote Git repositories.
 
@@ -509,6 +509,8 @@ def go_remote_library(name, get, packages=None, revision=None, hashes=None, stri
       name (str): Name of the rule.
       get (str): The location to fetch from, as a URL (minus protocol, i.e. the same as a typical
                  go get request).
+      repo (str): Allows overriding the actual Git repo location. This is needed when the git
+                  repo and go get path disagree (e.g. for golang.org/x/whatever).
       packages (list): The list of packages to fetch / build within the repository (without the
                        leading repository itself). If not given the root of the repo is assumed.
       revision (str): Git revision (or tag) to check out. If not given master is used.
@@ -523,11 +525,12 @@ def go_remote_library(name, get, packages=None, revision=None, hashes=None, stri
 
     _, tools = _tool_path(CONFIG.GO_TEST_TOOL, _GO_TOOL)
     build = ' '.join(join_path(get, pkg) for pkg in packages) if packages else get
+    rm_cmd = 'rm -rf .git ' + ' '.join(strip or '')
+    repo = repo or get
     cmd = ' && '.join([
         'export GOPATH=$TMP_DIR:$TMP_DIR/$PKG',
-        'git clone https://%s $OUT' % get,
-        '(cd $OUT && git checkout -q %s && rm -rf .git)' % revision if revision else '(cd $OUT rm -rf .git)',
-        '(cd $OUT && rm -rf %s)' %  ' '.join(strip) if strip else '',
+        'git clone https://%s $OUT' % repo,
+        '(cd $OUT && git checkout -q %s && %s)' % (revision, rm_cmd) if revision else '(cd $OUT && %s)' % rm_cmd,
         '$TOOL1 remote -g $TOOL2 -s ' + build,
     ])
     git_rule = build_rule(
