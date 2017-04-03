@@ -23,10 +23,11 @@ var log = logging.MustGetLogger("remote")
 // but that would drop support for some older Go versions. One day.
 var ruleTemplate = template.Must(template.New("rule").Parse(`go_remote_library(
     name = '{{ .RuleName }}',
-    get = '{{ .GitURL }}',{{ with $pkgs := .Packages }}{{ if $pkgs }}
+    get = '{{ .GitURL }}',{{ if .RedirectedGitURL }}
+    repo = '{{ .RedirectedGitURL }}',{{ end }}{{ with $pkgs := .Packages }}{{ if $pkgs }}
     packages = [{{ range $i, $pkg := $pkgs }}
-        '{{ $pkg }}',
-{{ end }}    ],{{ end }}{{ end }}
+        '{{ $pkg }}',{{ end }}
+    ],{{ end }}{{ end }}
     revision = '{{ .Revision }}',{{ with $deps := .RepoDeps }}{{ if $deps }}
     deps = [{{ range $i, $dep := $deps }}
         '{{ $dep }}',{{ end }}
@@ -139,6 +140,7 @@ type jsonPackage struct {
 
 	// GitURL is not in the upstream structure. We annotate it ourselves later.
 	GitURL           string
+	RedirectedGitURL string
 	Revision         string
 	RepoImports      map[string]bool
 	packages         map[string]*jsonPackage
@@ -230,9 +232,12 @@ func (jp *jsonPackage) RuleName() string {
 func (jp *jsonPackage) Packages() []string {
 	ret := []string{}
 	for _, pkg := range jp.originalPackages {
-		if pkg != jp.GitURL && strings.HasPrefix(pkg, jp.GitURL) {
+		if strings.HasPrefix(pkg, jp.GitURL) {
 			ret = append(ret, strings.TrimLeft(strings.TrimPrefix(pkg, jp.GitURL), "/"))
 		}
+	}
+	if len(ret) == 1 && ret[0] == "" {
+		return nil // Don't need anything in this case, this is equivalent to an empty list.
 	}
 	return ret
 }
@@ -259,6 +264,11 @@ func (jp *jsonPackage) AnnotateGitURL() error {
 	}
 	// Strip https:// prefix for more natural Go paths. We can assume it again later.
 	jp.GitURL = strings.TrimSpace(strings.TrimPrefix(string(out), "https://"))
+	if strings.HasPrefix(jp.GitURL, "go.googlesource.com") {
+		// Special case these ones since they have a different Git origin to their path.
+		jp.RedirectedGitURL = jp.GitURL
+		jp.GitURL = strings.Replace(jp.GitURL, "go.googlesource.com", "golang.org/x", 1)
+	}
 	log.Debug("Running %s in %s...", "git log -n 1 --pretty=format:'%H'", jp.Dir)
 	cmd = exec.Command("git", "log", "-n", "1", "--pretty=format:'%H'")
 	cmd.Dir = jp.Dir

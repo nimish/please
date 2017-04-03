@@ -541,7 +541,7 @@ def go_remote_library(name, get, repo=None, packages=None, revision=None, hashes
         hashes = hashes,
         post_build = _define_go_libraries,
         tools = tools,
-        deps = deps,
+        exported_deps = deps,
         building_description = 'Fetching...',
         requires = ['go_src'],  # go list wants to see all the sources
     )
@@ -566,7 +566,7 @@ def _define_go_libraries(rule_name, output):
                 name = '_%s#%s' % (parent_rule, name),
                 srcs = _remote_lib_files(rule_name, gofiles, dir),
                 out = out,
-                deps = _remote_lib_deps(parent_rule, deps),
+                deps = _remote_lib_deps(parent_rule, deps) + [':' + rule_name],
             )
         elif len(parts) == 10:
             # More complex cgo_library rule
@@ -581,7 +581,7 @@ def _define_go_libraries(rule_name, output):
                 compiler_flags = cflags.split('^'),
                 linker_flags = ldflags.split('^'),
                 out = out,
-                deps = _remote_lib_deps(parent_rule, deps),
+                deps = _remote_lib_deps(parent_rule, deps) + [':' + rule_name],
             )
         else:
             raise ValueError('Unknown format returned from please_go_tool: ' + line)
@@ -595,7 +595,7 @@ def _remote_lib_files(rule_name, files, dir):
 
 def _remote_lib_deps(parent_rule, deps):
     """Turns the build output into a list of dependencies."""
-    return [':_%s#%s' % (parent_rule, dep) for dep in deps.split(',')] if deps else None
+    return [':_%s#%s' % (parent_rule, dep) for dep in deps.split(',')] if deps else []
 
 
 def go_yacc(name, src, out=None, visibility=None, labels=None):
