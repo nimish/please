@@ -44,14 +44,14 @@ func TestToGitMap(t *testing.T) {
 func TestToShortFormatString(t *testing.T) {
 	jps := jsonPackages{}
 	assert.NoError(t, jps.FromJSON([]byte(samplePackages)))
-	expected := "core|src/core|build_env.go,build_label.go,build_target.go,cache.go,config.go,file_label.go,glob.go,graph.go,lock.go,package.go,state.go,test_results.go,utils.go,version.go|cli\n"
+	expected := "core|src/core|core/core.a|build_env.go,build_label.go,build_target.go,cache.go,config.go,file_label.go,glob.go,graph.go,lock.go,package.go,state.go,test_results.go,utils.go,version.go|cli\n"
 	assert.Equal(t, expected, jps[0].ToShortFormatString(jps.ToMap()))
 }
 
 func TestToShortFormatStringCgo(t *testing.T) {
 	jps := jsonPackages{}
 	assert.NoError(t, jps.FromJSON([]byte(samplePackages)))
-	expected := "parse|src/parse|builtin_rules.go,parse_step.go,suggest.go|interpreter.go|interpreter.c|interpreter.h|--std=c99^-Werror|-ldl|core\n"
+	expected := "parse|src/parse|parse/parse.a|builtin_rules.go,parse_step.go,suggest.go|interpreter.go|interpreter.c|interpreter.h|--std=c99^-Werror|-ldl|core\n"
 	assert.Equal(t, expected, jps[2].ToShortFormatString(jps.ToMap()))
 }
 

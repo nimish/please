@@ -494,7 +494,7 @@ def go_get(name, get=None, outs=None, deps=None, exported_deps=None, visibility=
     )
 
 
-def go_remote_library(name, get, packages=None, revision=None, hashes=None,
+def go_remote_library(name, get, packages=None, revision=None, hashes=None, strip=None,
                       visibility=None, deps=None):
     """Defines a rule to fetch Go dependencies from remote Git repositories.
 
@@ -513,6 +513,7 @@ def go_remote_library(name, get, packages=None, revision=None, hashes=None,
       revision (str): Git revision (or tag) to check out. If not given master is used.
       hashes (list): Hashes to verify the rule output with. You should specify revision if you
                      pass this, since otherwise it will break as soon as master updates.
+      strip (list): List of directories to strip out of the repo.
       visibility (list): Visibility specification of the rule.
       deps (list): Dependencies for this rule.
     """
@@ -522,9 +523,10 @@ def go_remote_library(name, get, packages=None, revision=None, hashes=None,
     _, tools = _tool_path(CONFIG.GO_TEST_TOOL, _GO_TOOL)
     build = ' '.join(get + pkg for pkg in packages) if packages else get
     cmd = ' && '.join([
-        'export GOPATH=$TMP_DIR',
+        'export GOPATH=$TMP_DIR:$TMP_DIR/$PKG',
         'git clone https://%s $OUT' % get,
         '(cd $OUT && git checkout -q %s && rm -rf .git)' % revision if revision else '(cd $OUT rm -rf .git)',
+        '(cd $OUT && rm -rf %s)' %  ' '.join(strip) if strip else '',
         '$TOOL1 remote -g $TOOL2 -s ' + build,
     ])
     git_rule = build_rule(
@@ -537,6 +539,7 @@ def go_remote_library(name, get, packages=None, revision=None, hashes=None,
         tools = tools,
         deps = deps,
         building_description = 'Fetching...',
+        requires = ['go_src'],  # go list wants to see all the sources
     )
     filegroup(
         name = name,
@@ -551,17 +554,18 @@ def _define_go_libraries(rule_name, output):
     parent_rule = rule_name[:rule_name.find('#')].lstrip('_')
     for line in output:
         parts = line.split('|')
-        if len(parts) == 4:
+        if len(parts) == 5:
             # Simple go_library rule.
-            name, dir, gofiles, deps = parts
+            name, dir, out, gofiles, deps = parts
             new_rule = go_library(
                 name = '_%s#%s' % (parent_rule, name),
                 srcs = _remote_lib_files(rule_name, gofiles, dir),
+                out = out,
                 deps = _remote_lib_deps(parent_rule, deps),
             )
-        elif len(parts) == 9:
+        elif len(parts) == 10:
             # More complex cgo_library rule
-            name, dir, gofiles, cgofiles, cfiles, hfiles, cflags, ldflags, deps = parts
+            name, dir, out, gofiles, cgofiles, cfiles, hfiles, cflags, ldflags, deps = parts
             new_rule = cgo_library(
                 name = '_%s#%s' % (parent_rule, name),
                 srcs = _remote_lib_files(rule_name, cgofiles, dir),
@@ -570,6 +574,7 @@ def _define_go_libraries(rule_name, output):
                 hdrs = _remote_lib_files(rule_name, hfiles, dir),
                 compiler_flags = cflags.split('^'),
                 linker_flags = ldflags.split('^'),
+                out = out,
                 deps = _remote_lib_deps(parent_rule, deps),
             )
         else:

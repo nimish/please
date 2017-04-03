@@ -154,8 +154,9 @@ func (jp *jsonPackage) ToShortFormatString(packages map[string]*jsonPackage) str
 	dir := jp.trimRoot(jp.Dir)
 	gofiles := comma(jp.GoFiles)
 	deps := comma(jp.deps(packages))
+	out := strings.TrimPrefix(path.Join(dir, path.Base(jp.Target)), "src/")
 	if len(jp.CgoFiles) == 0 {
-		return fmt.Sprintf("%s|%s|%s|%s\n", name, dir, gofiles, deps)
+		return fmt.Sprintf("%s|%s|%s|%s|%s\n", name, dir, out, gofiles, deps)
 	}
 	// Cgo packages need quite a bit more information.
 	cgofiles := comma(jp.CgoFiles)
@@ -163,7 +164,7 @@ func (jp *jsonPackage) ToShortFormatString(packages map[string]*jsonPackage) str
 	hfiles := comma(jp.HFiles)
 	cflags := caret(jp.CgoCFLAGS)
 	ldflags := caret(jp.CgoLDFLAGS)
-	return fmt.Sprintf("%s|%s|%s|%s|%s|%s|%s|%s|%s\n", name, dir, gofiles, cgofiles, cfiles, hfiles, cflags, ldflags, deps)
+	return fmt.Sprintf("%s|%s|%s|%s|%s|%s|%s|%s|%s|%s\n", name, dir, out, gofiles, cgofiles, cfiles, hfiles, cflags, ldflags, deps)
 }
 
 // ToBuildRule returns a build rule representation suitable for copying into a BUILD file.
