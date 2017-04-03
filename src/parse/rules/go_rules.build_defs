@@ -520,8 +520,60 @@ def go_remote_library(name, get, repo=None, packages=None, revision=None, hashes
       visibility (list): Visibility specification of the rule.
       deps (list): Dependencies for this rule.
     """
+    _go_remote(
+        name = name,
+        get = get,
+        repo = repo,
+        packages = packages,
+        revision = revision,
+        hashes = hashes,
+        strip = strip,
+        visibility = visibility,
+        deps = deps,
+        binary = False,
+    )
+
+
+def go_remote_binary(name, get, repo=None, package='', revision=None, hashes=None, strip=None,
+                      visibility=None, deps=None):
+    """Defines a rule to fetch & build a Go binary from remote Git repositories.
+
+    This is akin to go get but only works on a single Git repo; dependencies must be
+    explicitly specified on the build rule (i.e. it is not recursive). On the bright side,
+    please_go_tool can template out an appropriate BUILD file for you.
+
+    Args:
+      name (str): Name of the rule.
+      get (str): The location to fetch from, as a URL (minus protocol, i.e. the same as a typical
+                 go get request).
+      repo (str): Allows overriding the actual Git repo location. This is needed when the git
+                  repo and go get path disagree (e.g. for golang.org/x/whatever).
+      package (str): The package that contains the main. If not given the repo root is assumed.
+      revision (str): Git revision (or tag) to check out. If not given master is used.
+      hashes (list): Hashes to verify the rule output with. You should specify revision if you
+                     pass this, since otherwise it will break as soon as master updates.
+      strip (list): List of directories to strip out of the repo.
+      visibility (list): Visibility specification of the rule.
+      deps (list): Dependencies for this rule.
+    """
+    _go_remote(
+        name = name,
+        get = get,
+        repo = repo,
+        packages = [package],
+        revision = revision,
+        hashes = hashes,
+        strip = strip,
+        visibility = visibility,
+        deps = deps,
+        binary = True,
+    )
+
+
+def _go_remote(name, get, repo=None, packages=None, revision=None, hashes=None, strip=None,
+               visibility=None, deps=None, binary=False):
     if hashes and not revision:
-        raise ParseError('You must pass revision to go_remote_library if you pass hashes')
+        raise ParseError('You must pass revision to go_remote_library or go_remote_binary if you pass hashes')
 
     _, tools = _tool_path(CONFIG.GO_TEST_TOOL, _GO_TOOL)
     build = ' '.join(join_path(get, pkg) for pkg in packages) if packages else get
@@ -545,12 +597,25 @@ def go_remote_library(name, get, repo=None, packages=None, revision=None, hashes
         building_description = 'Fetching...',
         requires = ['go_src'],  # go list wants to see all the sources
     )
-    filegroup(
-        name = name,
-        visibility = visibility,
-        exported_deps = deps,
-        deps = [git_rule],
-    )
+    if binary:
+        # Collecting the actual binary here is a mite trickier than one might hope for.
+        # We can't use a filegroup since the actual rule doesn't exist until a post-build rule
+        # creates it and we're not allowed to add extra sources to the filegroup.
+        genrule(
+            name = name,
+            binary = True,
+            outs = [packages[0]],
+            cmd = 'cp $PKG_DIR/bin/%s $OUTS' % packages[0],
+            visibility = visibility,
+            deps = [git_rule],
+        )
+    else:
+        filegroup(
+            name = name,
+            visibility = visibility,
+            exported_deps = deps,
+            deps = [git_rule],
+        )
 
 
 def _define_go_libraries(rule_name, output):

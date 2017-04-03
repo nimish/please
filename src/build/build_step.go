@@ -359,7 +359,6 @@ func moveOutput(target *core.BuildTarget, tmpOutput, realOutput string, filegrou
 	// file because other things might be using it already (because more than one filegroup can
 	// own the same file).
 	if filegroup && realOutputExists && core.IsSameFile(tmpOutput, realOutput) {
-		log.Debug("real output %s is same file", realOutput)
 		movePathHash(tmpOutput, realOutput, filegroup) // make sure this is updated regardless
 		return false, nil
 	}

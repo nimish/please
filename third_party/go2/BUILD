@@ -94,14 +94,12 @@ go_remote_library(
     ],
 )
 
-go_remote_library(
+go_remote_binary(
     name = 'go-bindata',
     get = 'github.com/jteeuwen/go-bindata',
-    packages = [
-        '',
-        'go-bindata',
-    ],
+    package = 'go-bindata',
     revision = 'a0ff2567cfb70903282db057e799fd826784d41d',
+    strip = ['testdata'],
 )
 
 go_remote_library(
@@ -155,11 +153,14 @@ go_remote_library(
 go_remote_library(
     name = 'go-multierror',
     get = 'github.com/hashicorp/go-multierror',
-    packages = [
-        '',
-        'vendor/github.com/hashicorp/errwrap',
-    ],
     revision = 'ed905158d87462226a13fe39ddf685ea65f1c11f',
+    deps = [':errwrap'],
+)
+
+go_remote_library(
+    name = 'errwrap',
+    get = 'github.com/hashicorp/errwrap',
+    revision = '7554cd9344cec97297fa6649b055a8c98c2a1e55',
 )
 
 go_remote_library(
@@ -276,9 +277,7 @@ go_remote_library(
 go_remote_library(
     name = 'protobuf',
     get = 'github.com/golang/protobuf',
-    packages = [
-        'protoc-gen-go',
-    ],
+    packages = ['proto'],
     revision = 'c9c7427a2a70d2eb3bafa0ab2dc163e45f143317',
 )
 
@@ -308,6 +307,14 @@ go_remote_library(
     name = 'testify',
     get = 'github.com/stretchr/testify',
     revision = '4d4bfba8f1d1027c4fdbe371823030df51419987',
+    deps = [':go-spew'],
+)
+
+go_remote_library(
+    name = 'go-spew',
+    get = 'github.com/davecgh/go-spew',
+    packages = ['spew'],
+    revision = '346938d642f2ec3594ed81d874461961cd0faa76',
 )
 
 go_remote_library(

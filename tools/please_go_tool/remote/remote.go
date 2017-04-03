@@ -123,16 +123,17 @@ func goList(gotool string, packages ...string) (jsonPackages, error) {
 // A jsonPackage is a minimal copy of go list's builtin struct definition.
 // Note that we don't support every possible feature here, only those that map to Please.
 type jsonPackage struct {
-	Dir          string // N.B. absolute path.
-	Root         string
-	Name         string
-	ImportPath   string
-	Target       string
-	Standard     bool
-	GoFiles      []string
-	CgoFiles     []string
-	CFiles       []string
-	HFiles       []string
+	Dir        string // N.B. absolute path.
+	Root       string
+	Name       string
+	ImportPath string
+	Target     string
+	Standard   bool
+	GoFiles    []string
+	CgoFiles   []string
+	CFiles     []string
+	HFiles     []string
+	// TODO(pebers): Add support for SFiles here once we can support them in go_library
 	CgoCFLAGS    []string
 	CgoLDFLAGS   []string
 	CgoPkgConfig []string // TODO(pebers): add support for this to cgo_library
