@@ -35,10 +35,10 @@ func TestToGitMap(t *testing.T) {
 	jps[1].GitURL = "github.com/thought-machine/please"
 	jps[2].GitURL = "github.com/thought-machine/pleasings"
 	expected := map[string]*jsonPackage{
-		"github.com/thought-machine/please":    jps[0],
+		"github.com/thought-machine/please":    jps[1],
 		"github.com/thought-machine/pleasings": jps[2],
 	}
-	assert.Equal(t, expected, jps.ToGitMap())
+	assert.Equal(t, expected, jps.ToGitMap([]string{"cli"}))
 }
 
 func TestToShortFormatString(t *testing.T) {
@@ -89,8 +89,8 @@ func TestToBuildRule(t *testing.T) {
     ],
 )
 `
-	assert.Equal(t, expected1, jps[0].ToBuildRule(jps.ToGitMap(), originalPackages))
-	assert.Equal(t, expected2, jps[2].ToBuildRule(jps.ToGitMap(), originalPackages))
+	assert.Equal(t, expected1, jps[0].ToBuildRule(jps.ToGitMap(nil), nil, originalPackages))
+	assert.Equal(t, expected2, jps[2].ToBuildRule(jps.ToGitMap(nil), nil, originalPackages))
 }
 
 func TestJsonPackagesSort(t *testing.T) {

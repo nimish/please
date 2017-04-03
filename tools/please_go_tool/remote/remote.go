@@ -52,7 +52,8 @@ func FetchLibraries(gotool string, shortFormat bool, packages ...string) (string
 	// This gives us all their dependencies. go get might have fetched some others that we
 	// don't know about, so we ask go list to re-describe them all to work out which are
 	// system or not.
-	packageData, err = goList(gotool, packageData.UniqueDeps()...)
+	deps := packageData.UniqueDeps()
+	packageData, err = goList(gotool, deps...)
 	if err != nil {
 		return "", err
 	}
@@ -73,10 +74,10 @@ func FetchLibraries(gotool string, shortFormat bool, packages ...string) (string
 	if err := packageData.AnnotateGitURLs(); err != nil {
 		return "", err
 	}
-	m := packageData.ToGitMap()
+	m := packageData.ToGitMap(packages)
 	out := []string{}
 	for _, pkg := range m {
-		out = append(out, pkg.ToBuildRule(m, packages))
+		out = append(out, pkg.ToBuildRule(m, packages, deps))
 	}
 	sort.Strings(out)
 	return strings.Join(out, "\n"), nil
@@ -145,6 +146,7 @@ type jsonPackage struct {
 	RepoImports      map[string]bool
 	packages         map[string]*jsonPackage
 	originalPackages []string
+	originalDeps     []string
 }
 
 // ToShortFormatString returns a short delimited string format that Please will re-parse later
@@ -175,9 +177,10 @@ func (jp *jsonPackage) ToShortFormatString(packages map[string]*jsonPackage) str
 }
 
 // ToBuildRule returns a build rule representation suitable for copying into a BUILD file.
-func (jp *jsonPackage) ToBuildRule(packages map[string]*jsonPackage, originalPackages []string) string {
+func (jp *jsonPackage) ToBuildRule(packages map[string]*jsonPackage, originalPackages, originalDeps []string) string {
 	jp.packages = packages
 	jp.originalPackages = originalPackages
+	jp.originalDeps = originalDeps
 	var buf bytes.Buffer
 	if err := ruleTemplate.Execute(&buf, jp); err != nil {
 		log.Fatalf("%s\n", err)
@@ -229,9 +232,20 @@ func (jp *jsonPackage) RuleName() string {
 }
 
 // Packages returns the set of packages we'll add to the BUILD rule declaration.
+// This is mostly intended for packages we pull in as a dependency, since in some cases
+// they don't have anything buildable at the repo root.
 func (jp *jsonPackage) Packages() []string {
 	ret := []string{}
+	// If it was one of the original requests, don't bother.
+	// This cuts down us having vast numbers of packages on all those rules.
 	for _, pkg := range jp.originalPackages {
+		if pkg == jp.ImportPath && pkg == jp.GitURL {
+			return nil
+		} else if pkg == jp.ImportPath && strings.HasPrefix(jp.ImportPath, jp.GitURL) {
+			return []string{strings.TrimLeft(strings.TrimPrefix(jp.ImportPath, jp.GitURL), "/")}
+		}
+	}
+	for _, pkg := range jp.originalDeps {
 		if strings.HasPrefix(pkg, jp.GitURL) {
 			ret = append(ret, strings.TrimLeft(strings.TrimPrefix(pkg, jp.GitURL), "/"))
 		}
@@ -319,9 +333,16 @@ func (jps jsonPackages) ToMap() map[string]*jsonPackage {
 }
 
 // ToGitMap converts the jsonPackages slice to a map of git repo -> representative package.
-func (jps jsonPackages) ToGitMap() map[string]*jsonPackage {
+func (jps jsonPackages) ToGitMap(originalPackages []string) map[string]*jsonPackage {
 	byImport := jps.ToMap()
 	m := map[string]*jsonPackage{}
+	// Bias towards having the original packages in the map first.
+	for _, pkg := range originalPackages {
+		if jp, present := byImport[pkg]; present && jp.GitURL != "" {
+			m[jp.GitURL] = jp
+			jp.RepoImports = map[string]bool{}
+		}
+	}
 	for _, jp := range jps {
 		if jp.GitURL == "" {
 			continue
