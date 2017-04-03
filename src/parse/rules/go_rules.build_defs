@@ -252,7 +252,7 @@ def _merge_cgo_obj(name, a_rule, o_rule=None, visibility=None, test_only=False, 
     )
 
 
-def go_binary(name, main=None, srcs=None, deps=None, visibility=None, test_only=False,
+def go_binary(name, main=None, srcs=None, out=None, deps=None, visibility=None, test_only=False,
               static=False):
     """Compiles a Go binary.
 
@@ -261,6 +261,7 @@ def go_binary(name, main=None, srcs=None, deps=None, visibility=None, test_only=
       main (str): Deprecated, prefer srcs instead.
                   Go source file containing the main function.
       srcs (list): Go source files, one of which contains the main function.
+      out (str): Name of the output file to create. Defaults to the same as `name`.
       deps (list): Dependencies
       visibility (list): Visibility specification
       test_only (bool): If True, is only visible to test rules.
@@ -279,11 +280,11 @@ def go_binary(name, main=None, srcs=None, deps=None, visibility=None, test_only=
         test_only=test_only,
     )
     cmds, tools = _go_binary_cmds(static=static)
-    build_rule(
+    return build_rule(
         name=name,
         srcs=[':_%s#lib' % name],
         deps=deps,
-        outs=[name],
+        outs=[out or name],
         cmd=cmds,
         building_description="Linking...",
         needs_transitive_deps=True,
@@ -495,7 +496,7 @@ def go_get(name, get=None, outs=None, deps=None, exported_deps=None, visibility=
 
 
 def go_remote_library(name, get, packages=None, revision=None, hashes=None, strip=None,
-                      visibility=None, deps=None):
+                      visibility=None, deps=None, _binary=False):
     """Defines a rule to fetch Go dependencies from remote Git repositories.
 
     This is akin to go get but only works on a single Git repo; dependencies must be
@@ -521,7 +522,7 @@ def go_remote_library(name, get, packages=None, revision=None, hashes=None, stri
         raise ParseError('You must pass revision to go_remote_library if you pass hashes')
 
     _, tools = _tool_path(CONFIG.GO_TEST_TOOL, _GO_TOOL)
-    build = ' '.join(get + pkg for pkg in packages) if packages else get
+    build = ' '.join(join_path(get, pkg) for pkg in packages) if packages else get
     cmd = ' && '.join([
         'export GOPATH=$TMP_DIR:$TMP_DIR/$PKG',
         'git clone https://%s $OUT' % get,
@@ -555,9 +556,10 @@ def _define_go_libraries(rule_name, output):
     for line in output:
         parts = line.split('|')
         if len(parts) == 5:
-            # Simple go_library rule.
+            # Simple go_library or go_binary rule.
             name, dir, out, gofiles, deps = parts
-            new_rule = go_library(
+            rule_def = go_binary if out.startswith('bin/') else go_library
+            new_rule = rule_def(
                 name = '_%s#%s' % (parent_rule, name),
                 srcs = _remote_lib_files(rule_name, gofiles, dir),
                 out = out,
@@ -565,6 +567,7 @@ def _define_go_libraries(rule_name, output):
             )
         elif len(parts) == 10:
             # More complex cgo_library rule
+            # We don't support cgo in the main package so there is no cgo_binary.
             name, dir, out, gofiles, cgofiles, cfiles, hfiles, cflags, ldflags, deps = parts
             new_rule = cgo_library(
                 name = '_%s#%s' % (parent_rule, name),

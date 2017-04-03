@@ -123,6 +123,7 @@ func goList(gotool string, packages ...string) (jsonPackages, error) {
 type jsonPackage struct {
 	Dir          string // N.B. absolute path.
 	Root         string
+	Name         string
 	ImportPath   string
 	Target       string
 	Standard     bool
@@ -155,6 +156,10 @@ func (jp *jsonPackage) ToShortFormatString(packages map[string]*jsonPackage) str
 	gofiles := comma(jp.GoFiles)
 	deps := comma(jp.deps(packages))
 	out := strings.TrimPrefix(path.Join(dir, path.Base(jp.Target)), "src/")
+	if jp.Name == "main" {
+		// If it's package main, assume it's a binary (there isn't a specific field for this)
+		out = path.Join("bin", path.Base(jp.Target))
+	}
 	if len(jp.CgoFiles) == 0 {
 		return fmt.Sprintf("%s|%s|%s|%s|%s\n", name, dir, out, gofiles, deps)
 	}
