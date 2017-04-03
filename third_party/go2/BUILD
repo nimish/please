@@ -7,6 +7,9 @@ go_remote_library(
 go_remote_library(
     name = 'client_golang',
     get = 'github.com/prometheus/client_golang',
+    packages = [
+        'prometheus',
+    ],
     revision = '738ed6c0b9b30ec936d4b74c1600ae76324efff5',
     deps = [
         ':client_model',
@@ -32,6 +35,11 @@ go_remote_library(
 go_remote_library(
     name = 'common',
     get = 'github.com/prometheus/common',
+    packages = [
+        'expfmt',
+        'internal/bitbucket.org/ww/goautoneg',
+        'model',
+    ],
     revision = '49fee292b27bfff7f354ee0f64e1bc4850462edf',
     deps = [
         ':client_model',
@@ -55,6 +63,9 @@ go_remote_library(
 go_remote_library(
     name = 'crypto',
     get = 'golang.org/x/crypto',
+    packages = [
+        'ssh/terminal',
+    ],
     repo = 'go.googlesource.com/crypto',
     revision = '459e26527287adbc2adcc5d0d49abff9a5f315a7',
 )
@@ -96,6 +107,9 @@ go_remote_library(
 go_remote_library(
     name = 'go-datastructures',
     get = 'github.com/Workiva/go-datastructures',
+    packages = [
+        'queue',
+    ],
     revision = 'dd1dc71ac92298310606ac77d9519ddf1c6e2500',
 )
 
@@ -151,6 +165,9 @@ go_remote_library(
 go_remote_library(
     name = 'go-semver',
     get = 'github.com/coreos/go-semver',
+    packages = [
+        'semver',
+    ],
     revision = '5e3acbb5668c4c3deb4842615c4098eb61fb6b1e',
 )
 
@@ -163,6 +180,9 @@ go_remote_library(
 go_remote_library(
     name = 'golang-levenshtein',
     get = 'github.com/texttheater/golang-levenshtein',
+    packages = [
+        'levenshtein',
+    ],
     revision = 'a809b0abc4bdd4591a275c2dcf0982b0581da4e6',
 )
 
@@ -211,6 +231,9 @@ go_remote_library(
 go_remote_library(
     name = 'net',
     get = 'golang.org/x/net',
+    packages = [
+        'context',
+    ],
     repo = 'go.googlesource.com/net',
     revision = 'ffcf1bedda3b04ebb15a168a59800a73d6dc0f4d',
     deps = [
@@ -253,6 +276,9 @@ go_remote_library(
 go_remote_library(
     name = 'protobuf',
     get = 'github.com/golang/protobuf',
+    packages = [
+        'protoc-gen-go',
+    ],
     revision = 'c9c7427a2a70d2eb3bafa0ab2dc163e45f143317',
 )
 
@@ -295,7 +321,7 @@ go_remote_library(
     name = 'tools',
     get = 'golang.org/x/tools',
     packages = [
-        'cover',
+        'cmd/stringer',
     ],
     repo = 'go.googlesource.com/tools',
     revision = 'd63e2b22b05a9682de336cd4802bba367ed429e7',
